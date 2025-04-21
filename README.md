@@ -1,6 +1,6 @@
 # FLUX.1-schnell multi-LoRA Explorer Cog Model
 
-This is an implementation of [black-forest-labs/FLUX.1-dev](https://huggingface.co/black-forest-labs/FLUX.1-schnell) as a [Cog](https://github.com/replicate/cog) model.
+This is an implementation of [black-forest-labs/FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) as a [Cog](https://github.com/replicate/cog) model.
 
 Named multi-LoRA Explorer, to explore the model with different LoRA weights.
 
