@@ -288,7 +288,7 @@ class Predictor(BasePredictor):
         if hf_loras:
             flux_kwargs["joint_attention_kwargs"] = {"scale": 1.0}
             # check if loras are new
-            if hf_loras != self.last_loaded_loras || lora_scales != self.last_loaded_lora_scales:
+            if hf_loras != self.last_loaded_loras or lora_scales != self.last_loaded_lora_scales:
                 pipe.unload_lora_weights()
                 # Check for hf_loras and lora_scales
                 if hf_loras and not lora_scales:
