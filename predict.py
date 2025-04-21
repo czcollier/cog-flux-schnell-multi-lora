@@ -207,11 +207,11 @@ class Predictor(BasePredictor):
             description="Number of images to output.",
             ge=1,
             le=4,
-            default=1,
+            default=4,
         ),
         num_inference_steps: int = Input(
             description="Number of inference steps",
-            ge=1,le=50,default=28,
+            ge=1,le=10,default=4,
         ),
         guidance_scale: float = Input(
             description="Guidance scale for the diffusion process",
