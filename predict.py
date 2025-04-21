@@ -60,6 +60,7 @@ class Predictor(BasePredictor):
 
         self.weights_cache = WeightsDownloadCache()
         self.last_loaded_loras = {}
+        self.last_loaded_lora_scales = {}
 
         print("Loading safety checker...")
         if not os.path.exists(SAFETY_CACHE):
@@ -184,6 +185,7 @@ class Predictor(BasePredictor):
         # print(f"adapter_names: {adapter_names}")
         # print(f"adapter_weights: {adapter_weights}")
         self.last_loaded_loras = hf_loras
+        self.last_loaded_lora_scales = lora_scales
         self.txt2img_pipe.set_adapters(adapter_names, adapter_weights=adapter_weights)
             
     @torch.inference_mode()
@@ -286,7 +288,7 @@ class Predictor(BasePredictor):
         if hf_loras:
             flux_kwargs["joint_attention_kwargs"] = {"scale": 1.0}
             # check if loras are new
-            if hf_loras != self.last_loaded_loras:
+            if hf_loras != self.last_loaded_loras || lora_scales != self.last_loaded_lora_scales:
                 pipe.unload_lora_weights()
                 # Check for hf_loras and lora_scales
                 if hf_loras and not lora_scales:
