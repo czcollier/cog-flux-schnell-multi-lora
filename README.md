@@ -1,6 +1,6 @@
-# FLUX.1-dev multi-LoRA Explorer Cog Model
+# FLUX.1-schnell multi-LoRA Explorer Cog Model
 
-This is an implementation of [black-forest-labs/FLUX.1-dev](https://huggingface.co/black-forest-labs/FLUX.1-dev) as a [Cog](https://github.com/replicate/cog) model.
+This is an implementation of [black-forest-labs/FLUX.1-dev](https://huggingface.co/black-forest-labs/FLUX.1-schnell) as a [Cog](https://github.com/replicate/cog) model.
 
 Named multi-LoRA Explorer, to explore the model with different LoRA weights.
 
@@ -16,6 +16,8 @@ Make sure you have [cog](https://github.com/replicate/cog) installed.
 To run a prediction:
 
     cog predict -i prompt="a photo of TOK, sftsrv style" -i extra_loras=["lucataco/flux-queso","https://huggingface.co/alvdansen/softserve_anime/resolve/main/flux_dev_softstyle_araminta_k.safetensors"]
+
+NOTE: Flux Dev LORAs often work fine with Flux Schnell. LORAs will saturate the model at the same weights as they would with Dev, so use lower weights with Schnell than you normally would with Dev.
 
 ![Output](output.0.png)
 
