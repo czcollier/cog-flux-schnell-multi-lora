@@ -21,6 +21,8 @@ from lora_loading_patch import load_lora_into_transformer
 from diffusers.pipelines.stable_diffusion.safety_checker import (
     StableDiffusionSafetyChecker
 )
+from sd_embed.embedding_funcs import get_weighted_text_embeddings_flux1
+
 
 MAX_IMAGE_SIZE = 1440
 MODEL_CACHE = "FLUX.1-schnell"
@@ -127,25 +129,22 @@ class Predictor(BasePredictor):
         return ((n + 15) // 16) * 16
     
     def load_loras(self, hf_loras, lora_scales):
-        # list of adapter names
-        names = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z']
-        count = 0
+        adapter_names = []
         # loop through each lora
-        for hf_lora in hf_loras:
+        for idx, hf_lora in enumerate(hf_loras):
             t1 = time.time()
+            adapter_name = f"adapter_{idx:03d}"
+            adapter_names.append(adapter_name)
+
             # Check for Huggingface Slug lucataco/flux-emoji
             if re.match(r"^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$", hf_lora):
                 print(f"Downloading LoRA weights from - HF path: {hf_lora}")
-                adapter_name = names[count]
-                count += 1
                 self.txt2img_pipe.load_lora_weights(hf_lora, adapter_name=adapter_name)
             # Check for Replicate tar file
             elif re.match(r"^https?://replicate.delivery/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/trained_model.tar", hf_lora):
                 print(f"Downloading LoRA weights from - Replicate URL: {hf_lora}")
                 local_weights_cache = self.weights_cache.ensure(hf_lora)
                 lora_path = os.path.join(local_weights_cache, "output/flux_train_replicate/lora.safetensors")
-                adapter_name = names[count]
-                count += 1
                 self.txt2img_pipe.load_lora_weights(lora_path, adapter_name=adapter_name)
             # Check for Huggingface URL
             elif re.match(r"^https?://huggingface.co", hf_lora):
@@ -153,8 +152,6 @@ class Predictor(BasePredictor):
                 huggingface_slug = re.search(r"^https?://huggingface.co/([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)", hf_lora).group(1)
                 weight_name = hf_lora.split('/')[-1]
                 print(f"HuggingFace slug from URL: {huggingface_slug}, weight name: {weight_name}")
-                adapter_name = names[count]
-                count += 1
                 self.txt2img_pipe.load_lora_weights(huggingface_slug, weight_name=weight_name)
             # Check for Civitai URL
             elif re.match(r"^https?://civitai.com/api/download/models/[0-9]+\?type=Model&format=SafeTensor", hf_lora):
@@ -162,8 +159,6 @@ class Predictor(BasePredictor):
                 civitai_slug = hf_lora.split('?type')[0]
                 print(f"Downloading LoRA weights from - Civitai URL: {civitai_slug}")
                 lora_path = self.weights_cache.ensure(hf_lora, file=True)
-                adapter_name = names[count]
-                count += 1
                 self.txt2img_pipe.load_lora_weights(lora_path, adapter_name=adapter_name)
             # Check for URL to a .safetensors file
             elif hf_lora.endswith('.safetensors'):
@@ -173,20 +168,17 @@ class Predictor(BasePredictor):
                 except Exception as e:
                     print(f"Error downloading LoRA weights: {e}")
                     continue
-                adapter_name = names[count]
-                count += 1
                 self.txt2img_pipe.load_lora_weights(lora_path, adapter_name=adapter_name)
             else:
                 raise Exception(f"Invalid lora, must be either a: HuggingFace path, Replicate model.tar, or a URL to a .safetensors file: {hf_lora}")
             t2 = time.time()
             print(f"Loading LoRA took: {t2 - t1:.2f} seconds")
-        adapter_names = names[:count]
-        adapter_weights = lora_scales[:count]
+        
         # print(f"adapter_names: {adapter_names}")
         # print(f"adapter_weights: {adapter_weights}")
         self.last_loaded_loras = hf_loras
         self.last_loaded_lora_scales = lora_scales
-        self.txt2img_pipe.set_adapters(adapter_names, adapter_weights=adapter_weights)
+        self.txt2img_pipe.set_adapters(adapter_names, adapter_weights=lora_scales)
             
     @torch.inference_mode()
     def predict(
@@ -286,22 +278,14 @@ class Predictor(BasePredictor):
             pipe = self.txt2img_pipe
         
         if hf_loras:
+            if len(hf_loras) != len(lora_scales):
+                raise Exception(f"number of lora scales ({len(lora_scales)}) does not match number of loras ({len(hf_loras)})")
+
             flux_kwargs["joint_attention_kwargs"] = {"scale": 1.0}
             # check if loras are new
             if hf_loras != self.last_loaded_loras or lora_scales != self.last_loaded_lora_scales:
                 pipe.unload_lora_weights()
-                # Check for hf_loras and lora_scales
-                if hf_loras and not lora_scales:
-                    # If no lora_scales are provided, use 0.8 for each lora
-                    lora_scales = [0.8] * len(hf_loras)
-                    self.load_loras(hf_loras, lora_scales)
-                elif hf_loras and len(lora_scales) == 1:
-                    # If only one lora_scale is provided, use it for all loras
-                    lora_scales = [lora_scales[0]] * len(hf_loras)
-                    self.load_loras(hf_loras, lora_scales)
-                elif hf_loras and len(lora_scales) >= len(hf_loras):
-                    # If lora_scales are provided, use them for each lora
-                    self.load_loras(hf_loras, lora_scales)
+                self.load_loras(hf_loras, lora_scales)
         else:
             flux_kwargs["joint_attention_kwargs"] = None
             pipe.unload_lora_weights()
@@ -311,13 +295,20 @@ class Predictor(BasePredictor):
 
         generator = torch.Generator("cuda").manual_seed(seed)
 
+        (prompt_embeds, pooled_prompt_embeds) = get_weighted_text_embeddings_flux1(
+          pipe,
+          prompt = prompt
+        )
+
         common_args = {
-            "prompt": [prompt] * num_outputs,
+            "prompt_embeds": prompt_embeds,
+            "pooled_prompt_embeds": pooled_prompt_embeds,
             "guidance_scale": guidance_scale,
             "generator": generator,
             "num_inference_steps": num_inference_steps,
             "max_sequence_length": max_sequence_length,
-            "output_type": "pil"
+            "num_images_per_prompt": num_outputs,
+            "output_type": "pil",
         }
 
         output = pipe(**common_args, **flux_kwargs)
