@@ -205,11 +205,11 @@ class Predictor(BasePredictor):
         ),
         num_inference_steps: int = Input(
             description="Number of inference steps",
-            ge=1,le=10,default=4,
+            ge=1,le=30,default=4,
         ),
         guidance_scale: float = Input(
             description="Guidance scale for the diffusion process",
-            ge=0,le=30,default=3.5,
+            ge=0,le=15,default=3.5,
         ),
         seed: int = Input(description="Random seed. Set for reproducible generation", default=None),
         output_format: str = Input(
