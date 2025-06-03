@@ -209,7 +209,7 @@ class Predictor(BasePredictor):
         ),
         guidance_scale: float = Input(
             description="Guidance scale for the diffusion process",
-            ge=0,le=10,default=3.5,
+            ge=0,le=30,default=3.5,
         ),
         seed: int = Input(description="Random seed. Set for reproducible generation", default=None),
         output_format: str = Input(
